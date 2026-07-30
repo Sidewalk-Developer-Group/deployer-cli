@@ -12,8 +12,16 @@ import (
 // credentials package for tokens).
 func newContextCommand(f *Factory) *cobra.Command {
 	root := &cobra.Command{
-		Use:     "context",
-		Short:   "Manage the configured instances",
+		Use:   "context",
+		Short: "Manage the configured instances",
+		Long: "A context is one Deployer instance plus the organization to act in. Deployer is\n" +
+			"self-hosted, so you may hold several — work, staging, a customer's instance —\n" +
+			"and switch with `context use`. `deployer login` creates one for you.\n\n" +
+			"Tokens are not stored here; they live in the OS keychain.",
+		Example: "  deployer context ls\n" +
+			"  deployer context use production\n" +
+			"  deployer context use production --org acme\n" +
+			"  deployer context rm old-instance",
 		Aliases: []string{"contexts"},
 		Args:    cobra.NoArgs,
 	}
@@ -23,6 +31,7 @@ func newContextCommand(f *Factory) *cobra.Command {
 			Use:     "ls",
 			Aliases: []string{"list"},
 			Short:   "List configured instances",
+			Long:    "Lists each configured instance. The current one is marked with an asterisk.",
 			Args:    cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, _ []string) error {
 				printer := f.Printer()
@@ -60,7 +69,10 @@ func newContextCommand(f *Factory) *cobra.Command {
 		&cobra.Command{
 			Use:   "rm <name>",
 			Short: "Forget an instance (and its stored token)",
-			Args:  cobra.ExactArgs(1),
+			Long: "Removes the context from the config file and deletes its stored token, so no\n" +
+				"credential is left behind for an instance you can no longer see. The token\n" +
+				"itself stays valid until revoked in the web app under Settings > Tokens.",
+			Args: wantArgs(1, 1, "deployer context rm <name>   — names come from `deployer context ls`"),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				printer := f.Printer()
 
@@ -100,7 +112,10 @@ func newContextUseCommand(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "use <name>",
 		Short: "Make an instance the default, optionally setting its organization",
-		Args:  cobra.ExactArgs(1),
+		Long: "Makes a context the default for later commands. With --org, also sets the\n" +
+			"organization those commands act in — useful when your account belongs to more\n" +
+			"than one and you would otherwise have to pass --org every time.",
+		Args: wantArgs(1, 1, "deployer context use <name> [--org <slug>]   — names come from `deployer context ls`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer := f.Printer()
 

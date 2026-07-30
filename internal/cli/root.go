@@ -240,7 +240,20 @@ func NewRootCommand(version, commit string) *cobra.Command {
 		Short: "Deploy to your own servers from the terminal",
 		Long: "deployer is the command-line client for a Deployer instance.\n\n" +
 			"It triggers deployments, streams their logs and reports their outcome as an\n" +
-			"exit code, so the same command works at a prompt and in CI.",
+			"exit code, so the same command works at a prompt and in CI.\n\n" +
+			"Getting started:\n" +
+			"  1. deployer login --api https://deployer.example.com\n" +
+			"     (create the token in the web app under Settings > Tokens)\n" +
+			"  2. deployer projects ls                    see what you can deploy\n" +
+			"  3. deployer envs ls <project>              see its environments\n" +
+			"  4. deployer deploy <project> <environment>\n\n" +
+			"Arguments are always slugs, never ids. Run `deployer <command> --help` for the\n" +
+			"flags of any command.",
+		Example: "  deployer login --api https://deployer.example.com\n" +
+			"  deployer projects ls\n" +
+			"  deployer deploy billing-api production\n" +
+			"  deployer status billing-api\n" +
+			"  deployer logs billing-api production",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		// Without this, a typo like `deployer deply` prints help and exits 0.

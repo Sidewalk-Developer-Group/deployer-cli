@@ -43,7 +43,7 @@ func newDeployCommand(f *Factory) *cobra.Command {
 			"  deployer deploy billing-api staging --branch fix/timeout\n" +
 			"  deployer deploy billing-api production --dry-run\n" +
 			"  deployer deploy billing-api production --no-follow --json",
-		Args: cobra.ExactArgs(2),
+		Args: wantArgs(2, 2, "deployer deploy <project> <environment>   — slugs, as listed by `deployer projects ls` and `deployer envs ls <project>`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer := f.Printer()
 

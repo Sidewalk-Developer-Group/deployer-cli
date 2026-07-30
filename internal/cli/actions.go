@@ -15,31 +15,51 @@ func newActionCommands(f *Factory) []*cobra.Command {
 		newActionCommand(f, actionSpec{
 			name:  "cancel",
 			short: "Cancel a running or queued deployment",
-			done:  "cancellation requested for %s",
+			long: "Asks the engine to stop a deployment that is pending, queued, running or\n" +
+				"awaiting approval. Cancellation is cooperative: the current stage finishes\n" +
+				"before the run stops, so the environment is never left mid-step. A deployment\n" +
+				"that has already finished cannot be cancelled and returns a 409 (exit 4).",
+			done: "cancellation requested for %s",
 		}),
 		newActionCommand(f, actionSpec{
 			name:  "retry",
 			short: "Retry a failed deployment",
-			done:  "retry queued as %s",
+			long: "Runs the same commit and branch again as a NEW deployment — the original run is\n" +
+				"immutable history and is never rewritten. Useful after fixing a server-side\n" +
+				"cause (disk, credentials, a flaky dependency mirror).",
+			done: "retry queued as %s",
 			// The API answers with the new deployment, so follow that one.
 			follow: true,
 		}),
 		newActionCommand(f, actionSpec{
-			name:   "rollback",
-			short:  "Roll an environment back to its previous release",
+			name:  "rollback",
+			short: "Roll an environment back to its previous release",
+			long: "Re-points the environment at the release that preceded this deployment, as a new\n" +
+				"audited run: no clone, no build — the target release is still on disk, so the\n" +
+				"symlink flip is near-instant.\n\n" +
+				"IMPORTANT: code is reverted; database migrations are NOT automatically\n" +
+				"reversed. If the deployment being rolled back ran a destructive migration, you\n" +
+				"must handle the data yourself.\n\n" +
+				"Fails with 409 (exit 4) if the target release has already been pruned by the\n" +
+				"environment's retention setting.",
 			done:   "rollback queued as %s",
 			follow: true,
 		}),
 		newActionCommand(f, actionSpec{
-			name:    "approve",
-			short:   "Approve a deployment waiting on an approval gate",
+			name:  "approve",
+			short: "Approve a deployment waiting on an approval gate",
+			long: "Releases a deployment parked on an approval gate so it proceeds. Requires the\n" +
+				"deployments:approve ability, and can_approve on a protected environment; the\n" +
+				"decision and any --comment are recorded in the audit log.",
 			done:    "approved %s",
 			comment: commentOptional,
 			follow:  true,
 		}),
 		newActionCommand(f, actionSpec{
-			name:    "reject",
-			short:   "Reject a deployment waiting on an approval gate",
+			name:  "reject",
+			short: "Reject a deployment waiting on an approval gate",
+			long: "Declines a deployment parked on an approval gate; it never runs. A --comment is\n" +
+				"required — the reason is what the person who requested the deploy will read.",
 			done:    "rejected %s",
 			comment: commentRequired,
 		}),
@@ -57,6 +77,7 @@ const (
 type actionSpec struct {
 	name    string
 	short   string
+	long    string
 	done    string
 	comment commentMode
 	// follow means the action produces work worth streaming when the operator
@@ -71,9 +92,11 @@ func newActionCommand(f *Factory, spec actionSpec) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   spec.name + " <deployment-id>",
-		Short: spec.short,
-		Args:  cobra.ExactArgs(1),
+		Use:     spec.name + " <deployment-id>",
+		Short:   spec.short,
+		Long:    spec.long,
+		Example: "  deployer " + spec.name + " 0198f3c1-6b2f-7a41-9c88-3f1c0d5e7a22",
+		Args:    wantArgs(1, 1, "deployer "+spec.name+" <deployment-id>   — ids come from `deployer status <project> <environment>`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer := f.Printer()
 

@@ -162,10 +162,31 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	}
 
 	if err := json.Unmarshal(raw, out); err != nil {
-		return fmt.Errorf("decoding %s response: %w", path, err)
+		return notJSON(c.baseURL.String(), path, response.Header.Get("Content-Type"), raw, err)
 	}
 
 	return nil
+}
+
+// notJSON explains a 2xx that isn't JSON. Overwhelmingly this is an instance
+// whose SPA catch-all answered a route it doesn't have: older Deployer builds
+// served the Vue shell for unknown /api paths, so the client saw `200 text/html`
+// and failed on "invalid character '<'" — which reads like a client bug and hides
+// the real cause. Say the real cause instead.
+func notJSON(baseURL, path, contentType string, body []byte, err error) error {
+	looksLikeHTML := strings.Contains(strings.ToLower(contentType), "html") ||
+		strings.HasPrefix(strings.TrimSpace(string(body)), "<")
+
+	if looksLikeHTML {
+		return fmt.Errorf(
+			"%s answered with a web page instead of JSON (path: %s).\n"+
+				"That instance most likely has no such endpoint — its Deployer build is older than this CLI.\n"+
+				"Confirm --api points at the right instance, run `deployer version --check`, then update the instance.",
+			baseURL, path,
+		)
+	}
+
+	return fmt.Errorf("decoding %s response from %s (content-type %q): %w", path, baseURL, contentType, err)
 }
 
 func (c *Client) get(ctx context.Context, path string, query url.Values, out any) error {

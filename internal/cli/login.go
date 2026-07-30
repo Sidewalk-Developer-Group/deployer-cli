@@ -182,7 +182,11 @@ func newWhoamiCommand(f *Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "whoami",
 		Short: "Show who the stored token authenticates as",
-		Args:  cobra.NoArgs,
+		Long: "Verifies the stored token against the instance and prints the user it belongs\n" +
+			"to, plus every organization they are a member of. The organization marked\n" +
+			"(default) is the one commands use when --org is not passed.",
+		Example: "  deployer whoami\n  deployer whoami --json",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			printer := f.Printer()
 

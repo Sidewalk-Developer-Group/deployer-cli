@@ -22,7 +22,7 @@ func newStatusCommand(f *Factory) *cobra.Command {
 		Long: "With an environment, prints its most recent deployment. Without one, prints\n" +
 			"every environment of the project and where each one stands.",
 		Example: "  deployer status billing-api\n  deployer status billing-api production",
-		Args:    cobra.RangeArgs(1, 2),
+		Args:    wantArgs(1, 2, "deployer status <project> [environment]   — omit the environment to see every environment of the project"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer := f.Printer()
 
@@ -160,7 +160,7 @@ func newLogsCommand(f *Factory) *cobra.Command {
 			"environment. With --follow, keeps streaming until the deployment finishes.",
 		Example: "  deployer logs billing-api production\n" +
 			"  deployer logs 0198f3c1-6b2f-7a41-9c88-3f1c0d5e7a22 --follow",
-		Args: cobra.RangeArgs(1, 2),
+		Args: wantArgs(1, 2, "deployer logs <deployment-id>   or   deployer logs <project> <environment>"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer := f.Printer()
 

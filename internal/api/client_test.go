@@ -291,3 +291,47 @@ func TestTerminalAndSuccessClassification(t *testing.T) {
 		}
 	}
 }
+
+func TestAnHtmlPageOnASuccessStatusExplainsItself(t *testing.T) {
+	// The shape a Deployer instance older than this CLI produced: its SPA
+	// catch-all answered an /api path it doesn't have, with 200 text/html.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte("<!doctype html><html><body><div id=\"app\"></div></body></html>"))
+	}))
+	defer server.Close()
+
+	client, _ := New(server.URL, "token", "test")
+
+	_, err := client.Resolve(context.Background(), "org", "billing-api", "production")
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+
+	// "invalid character '<'" is a true statement about JSON and a useless one
+	// about the operator's problem.
+	if strings.Contains(err.Error(), "invalid character") {
+		t.Errorf("raw JSON decode error leaked to the user: %v", err)
+	}
+
+	for _, want := range []string{"web page instead of JSON", "older than this CLI", "--api"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message missing %q:\n%s", want, err.Error())
+		}
+	}
+}
+
+func TestNonJsonNonHtmlBodyKeepsTheDecodeDetail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("not json at all"))
+	}))
+	defer server.Close()
+
+	client, _ := New(server.URL, "token", "test")
+
+	_, err := client.Me(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "text/plain") {
+		t.Fatalf("expected the content type in the error, got %v", err)
+	}
+}

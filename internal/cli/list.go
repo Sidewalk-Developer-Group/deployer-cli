@@ -11,6 +11,9 @@ func newProjectsCommand(f *Factory) *cobra.Command {
 		Use:     "ls",
 		Aliases: []string{"list"},
 		Short:   "List the organization's projects",
+		Long: "Lists every project in the organization with the status of its most recent\n" +
+			"deployment. The PROJECT column is the slug to pass to `deployer deploy`.",
+		Example: "  deployer projects ls\n  deployer projects ls --org acme\n  deployer projects ls --json",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			printer := f.Printer()
@@ -61,6 +64,7 @@ func newProjectsCommand(f *Factory) *cobra.Command {
 	projects := &cobra.Command{
 		Use:     "projects",
 		Short:   "Work with projects",
+		Long:    "Project subcommands. Today: `ls`.",
 		Aliases: []string{"project"},
 		Args:    cobra.NoArgs,
 	}
@@ -74,7 +78,11 @@ func newEnvsCommand(f *Factory) *cobra.Command {
 		Use:     "ls <project>",
 		Aliases: []string{"list"},
 		Short:   "List a project's environments",
-		Args:    cobra.ExactArgs(1),
+		Long: "Lists a project's environments with the branch each tracks and whether it is\n" +
+			"locked or gated by approval. The ENVIRONMENT column is the second argument to\n" +
+			"`deployer deploy`.",
+		Example: "  deployer envs ls billing-api",
+		Args:    wantArgs(1, 1, "deployer envs ls <project>   — the project slug, as listed by `deployer projects ls`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer := f.Printer()
 
@@ -123,6 +131,7 @@ func newEnvsCommand(f *Factory) *cobra.Command {
 	envs := &cobra.Command{
 		Use:     "envs",
 		Short:   "Work with environments",
+		Long:    "Environment subcommands. Today: `ls <project>`.",
 		Aliases: []string{"env", "environments"},
 		Args:    cobra.NoArgs,
 	}
