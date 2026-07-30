@@ -1,0 +1,39 @@
+# Example of the formula goreleaser generates and maintains. Do not edit by hand in the
+# tap repo: every tagged release overwrites it with the real version and checksums.
+class DeployerCli < Formula
+  desc "Deploy to your own servers from the terminal"
+  homepage "https://deployer.sidewalkdevelopers.io"
+  license "Apache-2.0"
+  version "0.1.0"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/Sidewalk-Developer-Group/deployer-cli/releases/download/v0.1.0/deployer_0.1.0_darwin_arm64.tar.gz"
+      sha256 "REPLACED_BY_GORELEASER"
+    end
+    on_intel do
+      url "https://github.com/Sidewalk-Developer-Group/deployer-cli/releases/download/v0.1.0/deployer_0.1.0_darwin_amd64.tar.gz"
+      sha256 "REPLACED_BY_GORELEASER"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/Sidewalk-Developer-Group/deployer-cli/releases/download/v0.1.0/deployer_0.1.0_linux_arm64.tar.gz"
+      sha256 "REPLACED_BY_GORELEASER"
+    end
+    on_intel do
+      url "https://github.com/Sidewalk-Developer-Group/deployer-cli/releases/download/v0.1.0/deployer_0.1.0_linux_amd64.tar.gz"
+      sha256 "REPLACED_BY_GORELEASER"
+    end
+  end
+
+  def install
+    bin.install "deployer"
+    generate_completions_from_executable(bin/"deployer", "completion")
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/deployer version")
+  end
+end

@@ -1,0 +1,82 @@
+version: 2
+
+project_name: deployer
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: deployer
+    main: .
+    binary: deployer
+    env:
+      # Static binaries: a CLI installed by Homebrew must not depend on the
+      # build machine's libc.
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .ShortCommit }}
+
+archives:
+  - id: deployer
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+checksums:
+  name_template: checksums.txt
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^test:"
+
+brews:
+    # Formula name is deployer-cli, not deployer: homebrew-core already ships a
+    # `deployer` formula (PHP Deployer, deployer.org). Sharing the name would let
+    # `brew install deployer` hand people a different tool. The installed binary
+    # is still `deployer` — core's is `dep`, so nothing collides on PATH.
+  - name: deployer-cli
+    repository:
+      owner: Sidewalk-Developer-Group
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://deployer.sidewalkdevelopers.io
+    description: Deploy to your own servers from the terminal
+    license: Apache-2.0
+    commit_author:
+      name: deployer-release
+      email: releases@sidewalkdevelopers.io
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/deployer version")
+    install: |
+      bin.install "deployer"
+      generate_completions_from_executable(bin/"deployer", "completion")
+
+release:
+  draft: false
+  prerelease: auto
+  footer: |
+    ## Install
+
+    ```sh
+    brew install sidewalk-developer-group/tap/deployer-cli
+    ```
