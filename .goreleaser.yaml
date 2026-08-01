@@ -32,7 +32,7 @@ archives:
       - README.md
       - LICENSE
 
-checksums:
+checksum:
   name_template: checksums.txt
   algorithm: sha256
 
@@ -48,28 +48,38 @@ changelog:
       - "^chore:"
       - "^test:"
 
-brews:
-    # Formula name is deployer-cli, not deployer: homebrew-core already ships a
+# A cask, not a formula: `brews` is deprecated (removed in goreleaser v2.16) and
+# Homebrew itself now treats pre-built binaries as cask territory — formulae are
+# meant to build from source. Casks are macOS-only; Linux users take the archives
+# from the GitHub release (see Phase 16b for the curl|sh + container channels).
+homebrew_casks:
+    # Cask name is deployer-cli, not deployer: homebrew-core already ships a
     # `deployer` formula (PHP Deployer, deployer.org). Sharing the name would let
     # `brew install deployer` hand people a different tool. The installed binary
     # is still `deployer` — core's is `dep`, so nothing collides on PATH.
   - name: deployer-cli
+    binaries:
+      - deployer
     repository:
       owner: Sidewalk-Developer-Group
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
+    directory: Casks
     homepage: https://deployer.sidewalkdevelopers.io
     description: Deploy to your own servers from the terminal
-    license: Apache-2.0
     commit_author:
       name: deployer-release
       email: releases@sidewalkdevelopers.io
-    test: |
-      assert_match version.to_s, shell_output("#{bin}/deployer version")
-    install: |
-      bin.install "deployer"
-      generate_completions_from_executable(bin/"deployer", "completion")
+    hooks:
+      post:
+        # The binaries are not Apple-signed, so Gatekeeper quarantines anything a
+        # cask downloads and the first run dies with "cannot be opened". Strip the
+        # attribute on install. Signing + notarisation is the real fix and is
+        # Phase 16c — until then this is what makes `brew install` usable at all.
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/deployer"]
+          end
 
 release:
   draft: false

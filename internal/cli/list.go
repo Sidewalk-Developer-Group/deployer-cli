@@ -99,7 +99,7 @@ func newEnvsCommand(f *Factory) *cobra.Command {
 
 			target, err := s.Client.Resolve(cmd.Context(), organization, args[0], "")
 			if err != nil {
-				return err
+				return explainResolveFailure(printer, err, args[0], "")
 			}
 
 			environments, err := s.Client.Environments(cmd.Context(), target.Project.ID)

@@ -44,7 +44,7 @@ func newStatusCommand(f *Factory) *cobra.Command {
 
 			target, err := s.Client.Resolve(cmd.Context(), organization, args[0], environmentSlug)
 			if err != nil {
-				return err
+				return explainResolveFailure(printer, err, args[0], environmentSlug)
 			}
 
 			if target.Environment != nil {
@@ -180,7 +180,7 @@ func newLogsCommand(f *Factory) *cobra.Command {
 
 				target, err := s.Client.Resolve(cmd.Context(), organization, args[0], args[1])
 				if err != nil {
-					return err
+					return explainResolveFailure(printer, err, args[0], args[1])
 				}
 
 				if target.Environment == nil {
