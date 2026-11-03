@@ -7,13 +7,13 @@ from the tap name, so the `homebrew-` prefix is not optional.
 ```
 homebrew-tap/
 ├── README.md
-└── Formula/
+└── Casks/
     └── deployer-cli.rb  ← written and bumped by goreleaser on every tagged release
 ```
 
-`Formula/deployer-cli.rb` does not need to be hand-authored: the first `goreleaser release`
+`Casks/deployer-cli.rb` does not need to be hand-authored: the first `goreleaser release`
 run in `deployer-cli` creates it, and every later release commits an updated version and
-checksums. `Formula/deployer-cli.rb.example` here shows the shape it will take, for review.
+checksums.
 
 ## Once published
 
@@ -21,7 +21,7 @@ checksums. `Formula/deployer-cli.rb.example` here shows the shape it will take, 
 brew install sidewalk-developer-group/tap/deployer-cli
 ```
 
-The formula is `deployer-cli`, not `deployer`: homebrew-core already ships a `deployer`
+The cask is `deployer-cli`, not `deployer`: homebrew-core already ships a `deployer`
 formula (PHP Deployer, deployer.org), and sharing the name would make
 `brew install deployer` resolve to core's — a different tool. The **binary** installed is
 still `deployer`; core's is `dep`, so nothing collides on `PATH`.
@@ -34,11 +34,11 @@ brew install deployer-cli
 ```
 
 `brew install sidewalk-developer-group/tap` on its own is **not** valid — that names the
-tap, not a formula.
+tap, not a cask.
 
 ## Prerequisites for the release pipeline
 
 In `Sidewalk-Developer-Group/deployer-cli`, add an Actions secret `HOMEBREW_TAP_TOKEN`:
 a fine-grained PAT with **Contents: read and write** on `homebrew-tap` only. The default
 `GITHUB_TOKEN` cannot push to another repository, so without it the release succeeds but
-the formula is never bumped.
+the cask is never bumped.
