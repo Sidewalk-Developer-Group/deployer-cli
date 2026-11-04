@@ -38,7 +38,8 @@ Or download a binary for macOS/Linux (amd64/arm64) from the
 Deployer is self-hosted, so start by pointing the CLI at your instance. Create a
 personal access token in the web app under **Settings › Tokens** with at least the
 `projects:read`, `deployments:read` and `deployments:create` abilities — add
-`deployments:approve` to approve or reject from the terminal.
+`deployments:approve` to approve or reject from the terminal, and `environments:exec`
+to use `deployer run` (owner/admin roles only; never granted to existing tokens).
 
 ```sh
 deployer login --api https://deployer.example.com
@@ -77,6 +78,29 @@ deployer rollback <deployment-id>
 deployer approve <deployment-id> -m "release window agreed"
 deployer reject <deployment-id> -m "waiting on the DB migration review"
 ```
+
+### Run a command in the live release
+
+```sh
+deployer run billing-api production -- php artisan migrate:status
+deployer run billing-api staging -- 'tail -n 50 storage/logs/laravel.log | grep ERROR'
+deployer run billing-api production --max-runtime 10m -- php artisan queue:retry all
+deployer run billing-api production --no-follow -- php artisan cache:clear   # prints the id
+deployer run --list billing-api production                                  # recent commands
+```
+
+Everything after `--` runs as the deploy user in the environment's current release.
+Several words are joined with spaces, as `ssh` does; quote the whole command to keep
+pipes and `&&` away from your local shell. Output streams until the command finishes,
+and `deployer run` exits with the **remote command's exit status** (`124` = it hit its
+time limit; `1` if the outcome is unknown because the connection dropped). Before the
+command starts, the codes below apply. Ctrl-C cancels it on the server and waits for it
+to stop (exit 130); a second Ctrl-C stops waiting. `--server <id>` picks a server other
+than the environment's primary.
+
+The token needs the `environments:exec` ability — a 403 means it is missing (or your role
+or the protected-environment rules do not allow it). Create a token with it under
+**Settings › Tokens**.
 
 Add `--json` to any command for machine-readable output. While following, `--json` emits
 newline-delimited events (`{"type":"log",…}`, `{"type":"status",…}`) so you can pipe it

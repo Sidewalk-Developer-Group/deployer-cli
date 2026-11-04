@@ -29,20 +29,26 @@ func wantArgs(min, max int, hint string) cobra.PositionalArgs {
 			return nil
 		}
 
-		out := cmd.ErrOrStderr()
-
-		fmt.Fprintf(out, "%s\n\n", describeArgCount(min, max, len(args)))
-		fmt.Fprintf(out, "  %s\n\n", hint)
-
-		if got := strings.Join(args, " "); got != "" {
-			fmt.Fprintf(out, "You typed: %s %s\n\n", cmd.CommandPath(), got)
-		}
-
-		fmt.Fprint(out, cmd.UsageString())
-
-		// errSilent: everything worth saying has just been said.
-		return exit.With(exit.Usage, errSilent)
+		return usageFailure(cmd, args, describeArgCount(min, max, len(args)), hint)
 	}
+}
+
+// usageFailure prints what was wrong, the expected form, what was typed and the
+// usage block, and returns a silent usage error.
+func usageFailure(cmd *cobra.Command, args []string, problem, hint string) error {
+	out := cmd.ErrOrStderr()
+
+	fmt.Fprintf(out, "%s\n\n", problem)
+	fmt.Fprintf(out, "  %s\n\n", hint)
+
+	if got := strings.Join(args, " "); got != "" {
+		fmt.Fprintf(out, "You typed: %s %s\n\n", cmd.CommandPath(), got)
+	}
+
+	fmt.Fprint(out, cmd.UsageString())
+
+	// errSilent: everything worth saying has just been said.
+	return exit.With(exit.Usage, errSilent)
 }
 
 // looksLikeUUID catches the commonest wrong turn: passing a public id where a

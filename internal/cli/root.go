@@ -279,6 +279,7 @@ func NewRootCommand(version, commit string) *cobra.Command {
 		newWhoamiCommand(factory),
 		newContextCommand(factory),
 		newDeployCommand(factory),
+		newRunCommand(factory),
 		newStatusCommand(factory),
 		newLogsCommand(factory),
 		newProjectsCommand(factory),

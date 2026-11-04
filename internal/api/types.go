@@ -77,6 +77,28 @@ type LogChunk struct {
 	CreatedAt *time.Time `json:"created_at"`
 }
 
+// EnvironmentCommand mirrors EnvironmentCommandResource. Its statuses are the
+// queued/running/succeeded/failed/cancelled subset of the deployment ones.
+// ExitCode is the remote process's exit status; nil when it is unknown (the
+// connection dropped, the worker died, it never started).
+type EnvironmentCommand struct {
+	ID      string `json:"id"`
+	Command string `json:"command"`
+	Status  string `json:"status"`
+	Server  *struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"server"`
+	TimeoutSeconds  int        `json:"timeout_seconds"`
+	ExitCode        *int       `json:"exit_code"`
+	CancelRequested bool       `json:"cancel_requested"`
+	OutputTruncated bool       `json:"output_truncated"`
+	ErrorSummary    string     `json:"error_summary"`
+	CreatedAt       *time.Time `json:"created_at"`
+	StartedAt       *time.Time `json:"started_at"`
+	FinishedAt      *time.Time `json:"finished_at"`
+}
+
 // Project mirrors the fields of ProjectResource the CLI lists.
 type Project struct {
 	ID          string `json:"id"`

@@ -1,5 +1,5 @@
-// Package follow tails a running deployment: it pages log chunks by their
-// monotonic seq and watches the deployment's status until it is terminal
+// Package follow tails a running deployment or environment command: it pages
+// log chunks by their monotonic seq and watches the status until it is terminal
 // (docs/CLI_DESIGN.md §4). Polling — not a websocket — is deliberate for P1:
 // the logs endpoint is already seq-cursored, and a poll loop cannot silently
 // drop a chunk the way a dropped socket can.
@@ -58,33 +58,92 @@ type event struct {
 	ID     string `json:"id,omitempty"`
 }
 
+// source is what the loop tails: seq-cursored log chunks plus a status to poll.
+// Deployments and ad-hoc environment commands share the shape, so they share
+// the loop.
+type source struct {
+	id     string
+	hint   string // what Ctrl-C does, shown when following starts
+	logs   func(ctx context.Context, after int64) ([]api.LogChunk, error)
+	status func(ctx context.Context) (string, error)
+}
+
 // Run follows deployment until it reaches a terminal status, printing log
 // chunks as they arrive. It returns the final deployment — the caller maps its
 // status onto the process exit code.
 func Run(ctx context.Context, client *api.Client, printer *ui.Printer, deployment *api.Deployment, opts Options) (*api.Deployment, error) {
+	current := deployment
+
+	err := loop(ctx, printer, source{
+		id:   deployment.ID,
+		hint: "press Ctrl-C to stop watching (the deployment keeps running)",
+		logs: func(ctx context.Context, after int64) ([]api.LogChunk, error) {
+			return client.Logs(ctx, deployment.ID, after, 500)
+		},
+		status: func(ctx context.Context) (string, error) {
+			refreshed, err := client.Deployment(ctx, deployment.ID)
+			if err != nil {
+				return "", err
+			}
+			current = refreshed
+
+			return refreshed.Status, nil
+		},
+	}, deployment.Status, opts)
+
+	return current, err
+}
+
+// RunCommand follows an ad-hoc environment command the same way. What Ctrl-C
+// does is the caller's business (it cancels the command), so ctx should only
+// end when the operator wants to stop watching.
+func RunCommand(ctx context.Context, client *api.Client, printer *ui.Printer, command *api.EnvironmentCommand, opts Options) (*api.EnvironmentCommand, error) {
+	current := command
+
+	err := loop(ctx, printer, source{
+		id:   command.ID,
+		hint: "press Ctrl-C to cancel it",
+		logs: func(ctx context.Context, after int64) ([]api.LogChunk, error) {
+			return client.CommandLogs(ctx, command.ID, after, 500)
+		},
+		status: func(ctx context.Context) (string, error) {
+			refreshed, err := client.Command(ctx, command.ID)
+			if err != nil {
+				return "", err
+			}
+			current = refreshed
+
+			return refreshed.Status, nil
+		},
+	}, command.Status, opts)
+
+	return current, err
+}
+
+// loop polls src until its status is terminal. Command statuses are a subset of
+// deployment statuses with the same terminal set, so api.IsTerminal serves both.
+func loop(ctx context.Context, printer *ui.Printer, src source, status string, opts Options) error {
 	opts = opts.withDefaults()
 
 	var (
 		after    int64
 		interval = opts.Interval
-		status   = deployment.Status
-		current  = deployment
 	)
 
 	if opts.JSON {
-		emit(printer, event{Type: "status", Status: status, ID: current.ID})
+		emit(printer, event{Type: "status", Status: status, ID: src.id})
 	} else {
-		printer.Info("following %s — press Ctrl-C to stop watching (the deployment keeps running)", current.ID)
+		printer.Info("following %s — %s", src.id, src.hint)
 	}
 
 	for {
-		chunks, err := client.Logs(ctx, current.ID, after, 500)
+		chunks, err := src.logs(ctx, after)
 		if err != nil {
 			if ctxDone(ctx) {
-				return current, ErrInterrupted
+				return ErrInterrupted
 			}
 
-			return current, err
+			return err
 		}
 
 		if len(chunks) > 0 {
@@ -95,46 +154,43 @@ func Run(ctx context.Context, client *api.Client, printer *ui.Printer, deploymen
 			interval = min(interval*2, opts.MaxInterval)
 		}
 
-		refreshed, err := client.Deployment(ctx, current.ID)
+		refreshed, err := src.status(ctx)
 		if err != nil {
 			if ctxDone(ctx) {
-				return current, ErrInterrupted
+				return ErrInterrupted
 			}
 
-			return current, err
+			return err
 		}
-		current = refreshed
 
-		if refreshed.Status != status {
-			status = refreshed.Status
+		if refreshed != status {
+			status = refreshed
 
 			if opts.JSON {
-				emit(printer, event{Type: "status", Status: status, ID: current.ID})
+				emit(printer, event{Type: "status", Status: status, ID: src.id})
 			} else {
 				printer.Printf("%s\n", printer.Status(status))
 			}
 		}
 
 		if status == api.StatusApprovalPending && !opts.WaitApproval {
-			return current, ErrAwaitingApproval
+			return ErrAwaitingApproval
 		}
 
 		if api.IsTerminal(status) {
 			// Log writes trail the status transition, so drain what's left
 			// before reporting an outcome — otherwise the last stage's output
 			// (usually the failure reason) is lost.
-			final, err := drain(ctx, client, printer, current.ID, after, opts.JSON)
-			if err != nil && !errors.Is(err, ErrInterrupted) {
-				return current, err
+			if err := drain(ctx, printer, src, after, opts.JSON); err != nil && !errors.Is(err, ErrInterrupted) {
+				return err
 			}
-			_ = final
 
-			return current, nil
+			return nil
 		}
 
 		select {
 		case <-ctx.Done():
-			return current, ErrInterrupted
+			return ErrInterrupted
 		case <-time.After(interval):
 		}
 	}
@@ -142,31 +198,31 @@ func Run(ctx context.Context, client *api.Client, printer *ui.Printer, deploymen
 
 // drain reads remaining chunks after a terminal status, stopping when a poll
 // returns nothing or the small budget is spent.
-func drain(ctx context.Context, client *api.Client, printer *ui.Printer, deploymentID string, after int64, asJSON bool) (int64, error) {
+func drain(ctx context.Context, printer *ui.Printer, src source, after int64, asJSON bool) error {
 	for attempt := 0; attempt < 5; attempt++ {
-		chunks, err := client.Logs(ctx, deploymentID, after, 500)
+		chunks, err := src.logs(ctx, after)
 		if err != nil {
 			if ctxDone(ctx) {
-				return after, ErrInterrupted
+				return ErrInterrupted
 			}
 
-			return after, err
+			return err
 		}
 
 		if len(chunks) == 0 {
-			return after, nil
+			return nil
 		}
 
 		after = write(printer, chunks, after, asJSON)
 
 		select {
 		case <-ctx.Done():
-			return after, ErrInterrupted
+			return ErrInterrupted
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
 
-	return after, nil
+	return nil
 }
 
 // write prints chunks and returns the new high-water seq. Chunk text is written

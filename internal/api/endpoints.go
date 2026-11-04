@@ -79,6 +79,10 @@ func (c *Client) Deployment(ctx context.Context, deploymentID string) (*Deployme
 // Logs returns chunks with seq greater than after. The server orders by seq, so
 // the caller advances `after` to the highest seq it has seen.
 func (c *Client) Logs(ctx context.Context, deploymentID string, after int64, perPage int) ([]LogChunk, error) {
+	return c.logs(ctx, "deployments/"+url.PathEscape(deploymentID)+"/logs", after, perPage)
+}
+
+func (c *Client) logs(ctx context.Context, path string, after int64, perPage int) ([]LogChunk, error) {
 	query := url.Values{}
 	if after > 0 {
 		query.Set("after", strconv.FormatInt(after, 10))
@@ -88,7 +92,7 @@ func (c *Client) Logs(ctx context.Context, deploymentID string, after int64, per
 	}
 
 	var out envelope[[]LogChunk]
-	if err := c.get(ctx, "deployments/"+url.PathEscape(deploymentID)+"/logs", query, &out); err != nil {
+	if err := c.get(ctx, path, query, &out); err != nil {
 		return nil, err
 	}
 
@@ -121,6 +125,64 @@ func (c *Client) Action(ctx context.Context, deploymentID, action string, body a
 	}
 
 	return &out.Data, nil
+}
+
+// CommandOptions maps onto RunEnvironmentCommandRequest. The command is one
+// string the server runs through the deploy user's shell; zero values are
+// omitted so the server's defaults (primary server, 1800s limit) apply.
+type CommandOptions struct {
+	Command        string `json:"command"`
+	Server         string `json:"server,omitempty"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty"`
+}
+
+// RunCommand starts an ad-hoc command in the environment's live release. Like a
+// deploy, the API answers 202 and the command runs on a worker.
+func (c *Client) RunCommand(ctx context.Context, environmentID string, opts CommandOptions) (*EnvironmentCommand, error) {
+	var out envelope[EnvironmentCommand]
+	if err := c.post(ctx, "environments/"+url.PathEscape(environmentID)+"/commands", opts, &out); err != nil {
+		return nil, err
+	}
+
+	return &out.Data, nil
+}
+
+func (c *Client) Command(ctx context.Context, commandID string) (*EnvironmentCommand, error) {
+	var out envelope[EnvironmentCommand]
+	if err := c.get(ctx, "environment-commands/"+url.PathEscape(commandID), nil, &out); err != nil {
+		return nil, err
+	}
+
+	return &out.Data, nil
+}
+
+// CommandLogs is Logs for an environment command: same seq cursor, no target.
+func (c *Client) CommandLogs(ctx context.Context, commandID string, after int64, perPage int) ([]LogChunk, error) {
+	return c.logs(ctx, "environment-commands/"+url.PathEscape(commandID)+"/logs", after, perPage)
+}
+
+// CancelCommand asks the worker to stop the command. It answers 202 at once;
+// the status turns cancelled when the remote process is actually gone.
+func (c *Client) CancelCommand(ctx context.Context, commandID string) (*EnvironmentCommand, error) {
+	var out envelope[EnvironmentCommand]
+	if err := c.post(ctx, "environment-commands/"+url.PathEscape(commandID)+"/cancel", nil, &out); err != nil {
+		return nil, err
+	}
+
+	return &out.Data, nil
+}
+
+// Commands is the environment's most recent commands, newest first (the first
+// page of a cursor-paginated history).
+func (c *Client) Commands(ctx context.Context, environmentID string, perPage int) ([]EnvironmentCommand, error) {
+	query := url.Values{"per_page": {strconv.Itoa(perPage)}}
+
+	var out envelope[[]EnvironmentCommand]
+	if err := c.get(ctx, "environments/"+url.PathEscape(environmentID)+"/commands", query, &out); err != nil {
+		return nil, err
+	}
+
+	return out.Data, nil
 }
 
 // Projects lists an organization's projects, following pagination to the end.
