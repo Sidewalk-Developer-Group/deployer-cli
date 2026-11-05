@@ -82,6 +82,7 @@ func importPipeline(ctx context.Context, c *api.Client, printer *ui.Printer, p *
 			return err
 		}
 		if !ok {
+			side.Printf("aborted, nothing imported\n")
 			return nil
 		}
 	}
@@ -136,7 +137,12 @@ func newPipelinesCommand(f *Factory) *cobra.Command {
 		Use:     "pipelines",
 		Aliases: []string{"pipeline"},
 		Short:   "List, export and import environment pipelines",
-		Args:    cobra.NoArgs,
+		Long: "Manage pipeline versions for a project and environment, using their slugs.\n" +
+			"Export unchanged YAML for review or import it into another environment.",
+		Example: "  deployer pipelines ls billing-api production\n" +
+			"  deployer pipelines export billing-api production -o pipeline.yml\n" +
+			"  deployer pipelines import billing-api staging -f pipeline.yml",
+		Args: cobra.NoArgs,
 	}
 	var output, id, input string
 	var o pipelineImportOptions
@@ -163,7 +169,11 @@ func newPipelinesCommand(f *Factory) *cobra.Command {
 		Use:     "ls <project> <env>",
 		Aliases: []string{"list"},
 		Short:   "List environment pipelines",
-		Args:    wantArgs(2, 2, "deployer pipelines ls <project> <env>"),
+		Long: "Lists pipeline versions, including their IDs, active state, stage count and update time.\n" +
+			"Use --json for the full response or --pipeline with export to select a version.",
+		Example: "  deployer pipelines ls billing-api production\n" +
+			"  deployer pipelines ls billing-api staging --json",
+		Args: wantArgs(2, 2, "deployer pipelines ls <project> <env>"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, env, err := resolve(cmd, args)
 			if err != nil {
@@ -179,7 +189,12 @@ func newPipelinesCommand(f *Factory) *cobra.Command {
 	export := &cobra.Command{
 		Use:   "export <project> <env>",
 		Short: "Export the active pipeline as YAML",
-		Args:  wantArgs(2, 2, "deployer pipelines export <project> <env>"),
+		Long: "Writes the server's YAML unchanged to stdout, or to a file with -o. Exports\n" +
+			"contain no secret values. Defaults to the active pipeline; --pipeline selects\n" +
+			"a version by ID from `deployer pipelines ls`.",
+		Example: "  deployer pipelines export billing-api production -o pipeline.yml\n" +
+			"  deployer pipelines export billing-api production | deployer pipelines import billing-api staging -f - --yes",
+		Args: wantArgs(2, 2, "deployer pipelines export <project> <env>"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, env, err := resolve(cmd, args)
 			if err != nil {
@@ -193,7 +208,14 @@ func newPipelinesCommand(f *Factory) *cobra.Command {
 	imp := &cobra.Command{
 		Use:   "import <project> <env> -f <file|->",
 		Short: "Import pipeline YAML as an inactive version",
-		Args:  wantArgs(2, 2, "deployer pipelines import <project> <env> -f <file|->"),
+		Long: "Creates an INACTIVE pipeline from YAML; --activate activates it after import.\n" +
+			"Shows the pipeline name, target and stages, then asks for confirmation (y/N).\n" +
+			"--yes skips confirmation and is required for -f - or noninteractive imports.\n" +
+			"Documents are limited to 256 KiB; summaries and warnings go to stderr.",
+		Example: "  deployer pipelines import billing-api staging -f pipeline.yml\n" +
+			"  deployer pipelines import billing-api staging -f pipeline.yml --activate --yes\n" +
+			"  deployer pipelines export billing-api production | deployer pipelines import billing-api staging -f - --yes",
+		Args: wantArgs(2, 2, "deployer pipelines import <project> <env> -f <file|->"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if input == "" {
 				return exit.Errorf(exit.Usage, "pass -f <file|->")

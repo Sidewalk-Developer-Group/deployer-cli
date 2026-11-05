@@ -159,7 +159,7 @@ func newLogsCommand(f *Factory) *cobra.Command {
 		Long: "Prints the log of a deployment by id, or of the most recent deployment of an\n" +
 			"environment. With --follow, keeps streaming until the deployment finishes.",
 		Example: "  deployer logs billing-api production\n" +
-			"  deployer logs 0198f3c1-6b2f-7a41-9c88-3f1c0d5e7a22 --follow",
+			"  deployer logs billing-api staging --follow",
 		Args: wantArgs(1, 2, "deployer logs <deployment-id>   or   deployer logs <project> <environment>"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer := f.Printer()

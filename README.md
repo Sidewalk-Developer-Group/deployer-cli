@@ -54,6 +54,10 @@ The instance is saved as a *context*. Add as many as you work with:
 ```sh
 deployer context ls
 deployer context use staging --org acme
+deployer whoami
+deployer logout --context old-instance
+deployer context rm old-instance
+deployer version --check
 ```
 
 ## Use
@@ -102,7 +106,8 @@ The token needs the `environments:exec` ability — a 403 means it is missing (o
 or the protected-environment rules do not allow it). Create a token with it under
 **Settings › Tokens**.
 
-Add `--json` to any command for machine-readable output. While following, `--json` emits
+Add `--json` to commands that render resources for machine-readable output (`api`
+and `pipelines export` always return the raw response). While following, `--json` emits
 newline-delimited events (`{"type":"log",…}`, `{"type":"status",…}`) so you can pipe it
 into `jq`.
 
@@ -132,10 +137,10 @@ Environment options include repeatable `--server`, `--pipeline-from <env-slug>`,
 
 ```sh
 deployer api organizations/{org}/projects | jq '.data'
-deployer api GET projects -F per_page=5 -i
-deployer api POST projects -f name=Example -F enabled=true
-deployer api PATCH projects/<id> --input payload.json
-deployer api organizations/{org}/projects --paginate | jq '.data'
+deployer api organizations/{org}/projects -F per_page=5 --include
+deployer api POST organizations/{org}/projects -f name='Billing API' -f slug=billing-api
+deployer api POST organizations/{org}/projects --input payload.json
+deployer api organizations/{org}/projects --paginate | jq '.data[].slug'
 ```
 
 Paths stay on the configured instance under `/api/v1/`; absolute URLs, traversal,
@@ -147,25 +152,27 @@ Simple nested objects (`a[b]`) and arrays (`a[]`) are supported. GET and DELETE
 fields become query parameters. `--input file|-` sends raw bytes and cannot be
 combined with fields. Use `-H 'Content-Type: ...'` for another content type.
 `--include` prints status and headers; `--silent` suppresses successful bodies.
-`--paginate` combines GET `data` arrays using page or cursor metadata. Errors print
-the response body to stderr and use the usual exit codes. `--json` is ignored;
-pipe to `jq` to filter output. JSON is formatted only when output is a terminal.
+`--paginate` combines GET `data` arrays using page or cursor metadata. A non-2xx
+response prints its body to stderr and exits 2 (400/404/422), 3 (401/403) or 4
+(anything else, including a refused redirect). `--json` is ignored; pipe to `jq`
+to filter output. JSON is formatted only when output is a terminal.
 
 ## Pipeline YAML
 
 ```sh
 deployer pipelines ls billing-api production
-deployer pipelines export billing-api production -o pipeline.yaml
+deployer pipelines export billing-api production -o pipeline.yml
 deployer pipelines export billing-api production --pipeline <id>
-deployer pipelines import billing-api staging -f pipeline.yaml
-deployer pipelines import billing-api staging -f pipeline.yaml --yes --activate
-cat pipeline.yaml | deployer pipelines import billing-api staging -f - --yes
+deployer pipelines import billing-api staging -f pipeline.yml
+deployer pipelines import billing-api staging -f pipeline.yml --yes --activate
+deployer pipelines export billing-api production | deployer pipelines import billing-api staging -f - --yes
 ```
 
 Exports preserve the server's YAML bytes and contain no secret values: stage
 schemas have no credential fields, notification channels reference IDs, and runtime
-variable tokens resolve during deployment. Import shows the name, target and stages
-before confirmation and creates an **inactive** pipeline. `--activate` activates it
+variable tokens resolve during deployment. Text you typed into a stage (a custom
+command, a health-check URL) is exported as written, so keep credentials out of it. Import shows the name, target and stages
+before a y/N confirmation and creates an **inactive** pipeline. `--activate` activates it
 after import. Noninteractive imports and stdin documents require `--yes`. Imports
 are limited to 256 KiB. `--json` returns the pipeline list or the imported resource
 and warnings; summaries and warnings go to stderr.

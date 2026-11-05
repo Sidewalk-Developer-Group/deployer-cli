@@ -31,8 +31,10 @@ func newLoginCommand(f *Factory) *cobra.Command {
 			"projects:read, deployments:read and deployments:create abilities (add\n" +
 			"deployments:approve to approve or reject from the terminal).\n\n" +
 			"The token is read from a prompt or from stdin — never from a flag, which\n" +
-			"would leave it in shell history and in the process list.",
-		Args: cobra.NoArgs,
+			"would leave it in shell history and in the process list. If the OS keychain\n" +
+			"is unavailable, a plaintext file with mode 0600 is used with a warning.",
+		Example: "  deployer login --api https://deployer.example.com",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			printer := f.Printer()
@@ -141,7 +143,8 @@ func newLogoutCommand(f *Factory) *cobra.Command {
 		Short: "Forget the stored token for a context",
 		Long: "Deletes the locally stored token. The token itself stays valid until it is\n" +
 			"revoked in the web app under Settings › Tokens.",
-		Args: cobra.NoArgs,
+		Example: "  deployer logout\n  deployer logout --context staging",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			printer := f.Printer()
 

@@ -238,22 +238,31 @@ func NewRootCommand(version, commit string) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "deployer",
 		Short: "Deploy to your own servers from the terminal",
-		Long: "deployer is the command-line client for a Deployer instance.\n\n" +
-			"It triggers deployments, streams their logs and reports their outcome as an\n" +
-			"exit code, so the same command works at a prompt and in CI.\n\n" +
+		Long: "deployer is the command-line client for a Deployer instance.\n" +
+			"Create projects and environments, deploy releases, run commands and manage pipelines.\n" +
+			"\n" +
 			"Getting started:\n" +
 			"  1. deployer login --api https://deployer.example.com\n" +
-			"     (create the token in the web app under Settings > Tokens)\n" +
-			"  2. deployer projects ls                    see what you can deploy\n" +
-			"  3. deployer envs ls <project>              see its environments\n" +
-			"  4. deployer deploy <project> <environment>\n\n" +
-			"Arguments are always slugs, never ids. Run `deployer <command> --help` for the\n" +
-			"flags of any command.",
+			"     Create a token in the web app under Settings > Tokens.\n" +
+			"  2. deployer projects ls; deployer projects create\n" +
+			"  3. deployer envs create <project>   (or envs ls <project>)\n" +
+			"  4. deployer deploy <project> <environment>\n" +
+			"  5. deployer run <project> <environment> -- <command...>\n" +
+			"  6. Use api for REST requests; pipelines export/import for pipeline YAML.\n" +
+			"\n" +
+			"Projects and environments are always named by slug, never id. approve, cancel,\n" +
+			"reject and retry take a deployment id from `deployer status`. Run\n" +
+			"`deployer <command> --help` for the flags and examples of any command.",
 		Example: "  deployer login --api https://deployer.example.com\n" +
 			"  deployer projects ls\n" +
+			"  deployer projects create --name \"Billing API\" --type laravel --yes\n" +
+			"  deployer envs create billing-api\n" +
 			"  deployer deploy billing-api production\n" +
-			"  deployer status billing-api\n" +
-			"  deployer logs billing-api production",
+			"  deployer status billing-api production\n" +
+			"  deployer run billing-api production -- php artisan migrate:status\n" +
+			"  deployer api organizations/{org}/projects --paginate\n" +
+			"  deployer pipelines export billing-api production -o pipeline.yml\n" +
+			"  deployer pipelines import billing-api staging -f pipeline.yml",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		// Without this, a typo like `deployer deply` prints help and exits 0.

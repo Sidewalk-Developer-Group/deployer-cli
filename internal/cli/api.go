@@ -158,7 +158,7 @@ func apiWrite(w io.Writer, body []byte, pretty bool) error {
 	if pretty {
 		var b bytes.Buffer
 		if json.Indent(&b, body, "", "  ") == nil {
-			body = b.Bytes()
+			body = append(b.Bytes(), '\n')
 		}
 	}
 	_, err := w.Write(body)
@@ -199,6 +199,9 @@ func runAPI(ctx context.Context, c *api.Client, method, path string, query url.V
 				}
 			}
 			fmt.Fprintln(out)
+		}
+		if location := response.Headers.Get("Location"); response.Status >= 300 && response.Status < 400 && location != "" {
+			fmt.Fprintf(stderr, "refused to follow %d redirect to %s\n", response.Status, location)
 		}
 		if response.Status < 200 || response.Status >= 300 {
 			if err := apiWrite(stderr, response.Body, writerTTY(stderr)); err != nil {
@@ -251,10 +254,28 @@ func runAPI(ctx context.Context, c *api.Client, method, path string, query url.V
 func newAPICommand(f *Factory) *cobra.Command {
 	var o apiOptions
 	cmd := &cobra.Command{
-		Use:     "api [METHOD] <path>",
-		Short:   "Make an authenticated request to this instance",
-		Example: "  deployer api organizations/{org}/projects | jq .\n  deployer api POST projects -f name=Example",
-		Args:    wantArgs(1, 2, "deployer api [METHOD] <path>"),
+		Use:   "api [METHOD] <path>",
+		Short: "Make an authenticated request to this instance",
+		Long: "Requests a path relative to /api/v1/ on the configured instance. {org} resolves\n" +
+			"the selected organization. Absolute URLs, traversal and redirects are refused.\n" +
+			"\n" +
+			"The method defaults to GET, or POST with fields or --input. Use -f key=value\n" +
+			"for strings and -F key=value for typed numbers, booleans, null or @file contents\n" +
+			"(@- reads stdin). GET and DELETE fields become query parameters. --input sends\n" +
+			"raw bytes from a file (or - for stdin) and cannot be combined with fields.\n" +
+			"\n" +
+			"-H adds headers; Authorization, Cookie and Host cannot be overridden. --include\n" +
+			"prints response status and headers. --paginate combines GET data arrays across\n" +
+			"pages. Pipe to jq to filter the response.\n" +
+			"\n" +
+			"A non-2xx response prints its body to stderr and exits 2 (400/404/422),\n" +
+			"3 (401/403) or 4 (anything else, including a refused redirect).",
+		Example: "  deployer api organizations/{org}/projects --paginate | jq '.data[].slug'\n" +
+			"  deployer api POST organizations/{org}/projects -f name='Billing API' -f slug=billing-api\n" +
+			"  deployer api POST organizations/{org}/projects --input payload.json\n" +
+			"  deployer api organizations/{org}/projects -F per_page=5 --include\n" +
+			"  deployer api organizations/{org}/projects -H 'Accept: application/json'",
+		Args: wantArgs(1, 2, "deployer api [METHOD] <path>"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			method, path := "GET", args[0]
 			hasBody := len(o.fields)+len(o.typed) > 0 || cmd.Flags().Changed("input")

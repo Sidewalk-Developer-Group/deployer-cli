@@ -64,7 +64,8 @@ func newProjectsCommand(f *Factory) *cobra.Command {
 	projects := &cobra.Command{
 		Use:     "projects",
 		Short:   "Work with projects",
-		Long:    "Project subcommands: `ls`, `create`.",
+		Long:    "List projects in the selected organization or create a project with an optional repository.",
+		Example: "  deployer projects ls\n  deployer projects create --name 'Billing API' --type laravel --yes",
 		Aliases: []string{"project"},
 		Args:    cobra.NoArgs,
 	}
@@ -131,7 +132,8 @@ func newEnvsCommand(f *Factory) *cobra.Command {
 	envs := &cobra.Command{
 		Use:     "envs",
 		Short:   "Work with environments",
-		Long:    "Environment subcommands: `ls <project>`, `create <project>`.",
+		Long:    "List a project's environments or create one with servers and an optional copied pipeline.\nUse the project slug shown by `deployer projects ls`.",
+		Example: "  deployer envs ls billing-api\n  deployer envs create billing-api",
 		Aliases: []string{"env", "environments"},
 		Args:    cobra.NoArgs,
 	}

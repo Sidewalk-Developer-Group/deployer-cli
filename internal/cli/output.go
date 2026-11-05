@@ -34,7 +34,12 @@ func newVersionCommand(f *Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the CLI version",
-		Args:  cobra.NoArgs,
+		Long: "Prints the CLI version and commit without authentication. With --check, also\n" +
+			"checks for a newer CLI release on a best-effort basis; an unreachable instance\n" +
+			"does not make this command fail.",
+		Example: "  deployer version\n" +
+			"  deployer version --check",
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			printer := f.Printer()
 

@@ -91,11 +91,16 @@ func newActionCommand(f *Factory, spec actionSpec) *cobra.Command {
 		noFollow bool
 	)
 
+	example := "  deployer status billing-api production\n  deployer " + spec.name + " <deployment-id>"
+	if spec.comment != commentNone {
+		example += " --comment 'Release window agreed'"
+	}
+
 	cmd := &cobra.Command{
 		Use:     spec.name + " <deployment-id>",
 		Short:   spec.short,
-		Long:    spec.long,
-		Example: "  deployer " + spec.name + " 0198f3c1-6b2f-7a41-9c88-3f1c0d5e7a22",
+		Long:    spec.long + "\n\nDeployment ids come from `deployer status <project> <environment>`.",
+		Example: example,
 		Args:    wantArgs(1, 1, "deployer "+spec.name+" <deployment-id>   — ids come from `deployer status <project> <environment>`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer := f.Printer()
