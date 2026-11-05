@@ -140,7 +140,8 @@ func submit(p *prompter, fields []intakeField, title string, post func() error, 
 						v = "set"
 					}
 				}
-				rows = append(rows, []string{f.label, v})
+				// "(optional)" is a prompt hint; in the summary it is noise.
+				rows = append(rows, []string{strings.TrimSuffix(f.label, " (optional)"), v})
 			}
 			summary := *p.printer
 			summary.Out = p.out

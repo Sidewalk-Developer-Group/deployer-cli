@@ -206,6 +206,21 @@ func TestCreateEnvironmentAttachmentsAndPipeline(t *testing.T) {
 	}
 }
 
+// Regression: the confirmation summary repeated the prompts' "(optional)" hint.
+func TestCreateSummaryDropsOptionalSuffix(t *testing.T) {
+	p, out := scripted("n\n")
+	desc := "Invoicing"
+	if _, err := submit(p, []intakeField{{key: "description", label: "Description (optional)", value: &desc}}, "Create?", func() error {
+		t.Fatal("posted after decline")
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "(optional)") || !strings.Contains(out.String(), "Description") {
+		t.Fatal(out.String())
+	}
+}
+
 // Regression: interactive mode used to discard --server and re-prompt.
 func TestCreateEnvironmentServerFlagSkipsPrompt(t *testing.T) {
 	var putBody map[string]any
