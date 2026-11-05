@@ -128,6 +128,48 @@ credentials without placing a secret in shell history; token prompts are hidden.
 Environment options include repeatable `--server`, `--pipeline-from <env-slug>`,
 `--requires-approval`, `--auto-deploy`, `--url`, `--base-path`, and `--retention`.
 
+## Raw API requests
+
+```sh
+deployer api organizations/{org}/projects | jq '.data'
+deployer api GET projects -F per_page=5 -i
+deployer api POST projects -f name=Example -F enabled=true
+deployer api PATCH projects/<id> --input payload.json
+deployer api organizations/{org}/projects --paginate | jq '.data'
+```
+
+Paths stay on the configured instance under `/api/v1/`; absolute URLs, traversal,
+and redirects are refused. Authorization, Cookie and Host headers cannot be
+provided with `-H`. `{org}` resolves the selected organization only when used.
+One path argument defaults to GET, or POST with fields or `--input`. String fields
+use `-f`; typed fields use `-F` (booleans, null, numbers, `@file` or `@-` contents).
+Simple nested objects (`a[b]`) and arrays (`a[]`) are supported. GET and DELETE
+fields become query parameters. `--input file|-` sends raw bytes and cannot be
+combined with fields. Use `-H 'Content-Type: ...'` for another content type.
+`--include` prints status and headers; `--silent` suppresses successful bodies.
+`--paginate` combines GET `data` arrays using page or cursor metadata. Errors print
+the response body to stderr and use the usual exit codes. `--json` is ignored;
+pipe to `jq` to filter output. JSON is formatted only when output is a terminal.
+
+## Pipeline YAML
+
+```sh
+deployer pipelines ls billing-api production
+deployer pipelines export billing-api production -o pipeline.yaml
+deployer pipelines export billing-api production --pipeline <id>
+deployer pipelines import billing-api staging -f pipeline.yaml
+deployer pipelines import billing-api staging -f pipeline.yaml --yes --activate
+cat pipeline.yaml | deployer pipelines import billing-api staging -f - --yes
+```
+
+Exports preserve the server's YAML bytes and contain no secret values: stage
+schemas have no credential fields, notification channels reference IDs, and runtime
+variable tokens resolve during deployment. Import shows the name, target and stages
+before confirmation and creates an **inactive** pipeline. `--activate` activates it
+after import. Noninteractive imports and stdin documents require `--yes`. Imports
+are limited to 256 KiB. `--json` returns the pipeline list or the imported resource
+and warnings; summaries and warnings go to stderr.
+
 ## In CI
 
 Following is on by default everywhere, terminal or not, so a CI job gets the real

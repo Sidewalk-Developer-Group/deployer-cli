@@ -347,3 +347,37 @@ func (c *Client) SyncEnvironmentServers(ctx context.Context, id string, servers 
 type CopyPipelineOptions struct {
 	EnvironmentID string `json:"environment_id,omitempty"`
 }
+
+// ExportPipeline preserves the server's deterministic YAML without re-encoding it.
+func (c *Client) ExportPipeline(ctx context.Context, id string) ([]byte, error) {
+	response, err := c.raw(ctx, "GET", "pipelines/"+url.PathEscape(id)+"/export", nil, nil, nil, false)
+	if err != nil {
+		return nil, err
+	}
+	if response.Status < 200 || response.Status >= 300 {
+		return nil, ParseProblem(response.Status, response.Body)
+	}
+	return response.Body, nil
+}
+
+// ImportPipeline leaves validation and stage schema ownership on the server.
+func (c *Client) ImportPipeline(ctx context.Context, env string, document []byte) (*Pipeline, []string, error) {
+	var out struct {
+		Data Pipeline `json:"data"`
+		Meta struct {
+			Warnings []string `json:"warnings"`
+		} `json:"meta"`
+	}
+	err := c.post(ctx, "environments/"+url.PathEscape(env)+"/pipelines/import", map[string]string{"yaml": string(document)}, &out)
+	if out.Meta.Warnings == nil {
+		out.Meta.Warnings = []string{}
+	}
+	return &out.Data, out.Meta.Warnings, err
+}
+
+// ActivatePipeline explicitly opts the imported version into deployment use.
+func (c *Client) ActivatePipeline(ctx context.Context, id string) (*Pipeline, error) {
+	var out envelope[Pipeline]
+	err := c.post(ctx, "pipelines/"+url.PathEscape(id)+"/activate", nil, &out)
+	return &out.Data, err
+}

@@ -67,7 +67,8 @@ func (p *Problem) Slug() string {
 	return p.Type
 }
 
-func parseProblem(status int, body []byte) *Problem {
+// ParseProblem shares HTTP error interpretation with raw API callers.
+func ParseProblem(status int, body []byte) *Problem {
 	problem := &Problem{Status: status}
 
 	if err := json.Unmarshal(body, problem); err != nil || (problem.Title == "" && problem.Detail == "") {

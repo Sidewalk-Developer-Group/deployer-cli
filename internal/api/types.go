@@ -1,6 +1,9 @@
 package api
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Deployment mirrors DeploymentResource. Only the fields the CLI renders are
 // declared; unknown fields are ignored so a newer API stays compatible.
@@ -198,10 +201,14 @@ type Server struct {
 	ConnectionStatus string `json:"connection_status"`
 }
 type Pipeline struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	IsActive bool   `json:"is_active"`
-	Version  int    `json:"version"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	IsActive    bool              `json:"is_active"`
+	Version     int               `json:"version"`
+	StagesCount *int              `json:"stages_count,omitempty"`
+	Stages      []json.RawMessage `json:"stages,omitempty"`
+	CreatedAt   *time.Time        `json:"created_at,omitempty"`
+	UpdatedAt   *time.Time        `json:"updated_at,omitempty"`
 }
 type ServerAttachment struct {
 	ServerID  string `json:"server_id,omitempty"`

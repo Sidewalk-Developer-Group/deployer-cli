@@ -274,6 +274,8 @@ func NewRootCommand(version, commit string) *cobra.Command {
 	cobra.OnInitialize(func() { factory.Color = !noColor })
 
 	root.AddCommand(
+		newAPICommand(factory),
+		newPipelinesCommand(factory),
 		newLoginCommand(factory),
 		newLogoutCommand(factory),
 		newWhoamiCommand(factory),

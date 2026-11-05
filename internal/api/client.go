@@ -106,8 +106,6 @@ func (c *Client) endpoint(path string, query url.Values) string {
 // be nil). Errors are *Problem for an API refusal and *TransportError for a
 // network failure, so callers can map them onto exit codes.
 func (c *Client) do(ctx context.Context, method, path string, query url.Values, body any, out any) error {
-	endpoint := c.endpoint(path, query)
-
 	var payload io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)
@@ -116,45 +114,13 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 		}
 		payload = bytes.NewReader(encoded)
 	}
-
-	request, err := http.NewRequestWithContext(ctx, method, endpoint, payload)
+	response, err := c.raw(ctx, method, path, query, nil, payload, false)
 	if err != nil {
-		return fmt.Errorf("building request: %w", err)
+		return err
 	}
-
-	request.Header.Set("Accept", "application/json")
-	request.Header.Set("User-Agent", fmt.Sprintf("deployer-cli/%s (%s/%s)", c.version, runtime.GOOS, runtime.GOARCH))
-
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
-
-	if c.token != "" {
-		request.Header.Set("Authorization", "Bearer "+c.token)
-	}
-
-	if c.debug != nil {
-		fmt.Fprintf(c.debug, "> %s %s\n", method, endpoint)
-	}
-
-	response, err := c.http.Do(request)
-	if err != nil {
-		return &TransportError{URL: endpoint, Err: err}
-	}
-	defer response.Body.Close()
-
-	// Bounded read: a runaway body must not exhaust memory in CI.
-	raw, err := io.ReadAll(io.LimitReader(response.Body, 32<<20))
-	if err != nil {
-		return &TransportError{URL: endpoint, Err: err}
-	}
-
-	if c.debug != nil {
-		fmt.Fprintf(c.debug, "< %d (%d bytes)\n", response.StatusCode, len(raw))
-	}
-
-	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return parseProblem(response.StatusCode, raw)
+	raw := response.Body
+	if response.Status < 200 || response.Status > 299 {
+		return ParseProblem(response.Status, raw)
 	}
 
 	if out == nil || len(raw) == 0 {
@@ -162,7 +128,7 @@ func (c *Client) do(ctx context.Context, method, path string, query url.Values, 
 	}
 
 	if err := json.Unmarshal(raw, out); err != nil {
-		return notJSON(c.baseURL.String(), path, response.Header.Get("Content-Type"), raw, err)
+		return notJSON(c.baseURL.String(), path, response.Headers.Get("Content-Type"), raw, err)
 	}
 
 	return nil
@@ -199,4 +165,58 @@ func (c *Client) post(ctx context.Context, path string, body any, out any) error
 
 func (c *Client) put(ctx context.Context, path string, body any, out any) error {
 	return c.do(ctx, http.MethodPut, path, nil, body, out)
+}
+
+// RawResponse preserves wire bytes so exports and raw API output round-trip.
+type RawResponse struct {
+	Status  int
+	Headers http.Header
+	Body    []byte
+}
+
+// Raw leaves HTTP refusals to the caller, while retaining authentication and
+// transport handling shared by typed endpoints. Redirects are refused so raw
+// requests cannot leave the configured instance or API root.
+func (c *Client) Raw(ctx context.Context, method, path string, query url.Values, header http.Header, body io.Reader) (*RawResponse, error) {
+	return c.raw(ctx, method, path, query, header, body, true)
+}
+
+func (c *Client) raw(ctx context.Context, method, path string, query url.Values, header http.Header, body io.Reader, refuseRedirects bool) (*RawResponse, error) {
+	endpoint := c.endpoint(path, query)
+	request, err := http.NewRequestWithContext(ctx, method, endpoint, body)
+	if err != nil {
+		return nil, fmt.Errorf("building request: %w", err)
+	}
+	request.Header.Set("Accept", "application/json")
+	request.Header.Set("User-Agent", fmt.Sprintf("deployer-cli/%s (%s/%s)", c.version, runtime.GOOS, runtime.GOARCH))
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	for key, values := range header {
+		request.Header[http.CanonicalHeaderKey(key)] = append([]string(nil), values...)
+	}
+	request.Header.Del("Authorization")
+	if c.token != "" {
+		request.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	if c.debug != nil {
+		fmt.Fprintf(c.debug, "> %s %s\n", method, endpoint)
+	}
+	client := *c.http
+	if refuseRedirects {
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, &TransportError{URL: endpoint, Err: err}
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+	if err != nil {
+		return nil, &TransportError{URL: endpoint, Err: err}
+	}
+	if c.debug != nil {
+		fmt.Fprintf(c.debug, "< %d (%d bytes)\n", response.StatusCode, len(raw))
+	}
+	return &RawResponse{Status: response.StatusCode, Headers: response.Header, Body: raw}, nil
 }
