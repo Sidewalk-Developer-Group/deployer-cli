@@ -196,3 +196,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values, out any
 func (c *Client) post(ctx context.Context, path string, body any, out any) error {
 	return c.do(ctx, http.MethodPost, path, nil, body, out)
 }
+
+func (c *Client) put(ctx context.Context, path string, body any, out any) error {
+	return c.do(ctx, http.MethodPut, path, nil, body, out)
+}

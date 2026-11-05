@@ -224,3 +224,126 @@ func (c *Client) Release(ctx context.Context) (*CliRelease, error) {
 
 	return &out.Data, nil
 }
+
+// CreateProjectOptions omits unset fields so server defaults remain authoritative.
+type CreateProjectOptions struct {
+	Name           string `json:"name,omitempty"`
+	Slug           string `json:"slug,omitempty"`
+	Description    string `json:"description,omitempty"`
+	ProjectType    string `json:"project_type,omitempty"`
+	ProjectGroupID string `json:"project_group_id,omitempty"`
+	PHPVersion     string `json:"php_version,omitempty"`
+	BasePath       string `json:"base_path,omitempty"`
+}
+
+// CreateRepositoryOptions omits unset fields so server defaults remain authoritative.
+type CreateRepositoryOptions struct {
+	Provider      string `json:"provider,omitempty"`
+	RepoURL       string `json:"repo_url,omitempty"`
+	DefaultBranch string `json:"default_branch,omitempty"`
+	CloneToken    string `json:"clone_token,omitempty"`
+	CloneUsername string `json:"clone_username,omitempty"`
+}
+
+// CreateEnvironmentOptions omits unset fields so server defaults remain authoritative.
+type CreateEnvironmentOptions struct {
+	RepositoryID     string `json:"repository_id,omitempty"`
+	Name             string `json:"name,omitempty"`
+	Slug             string `json:"slug,omitempty"`
+	URL              string `json:"url,omitempty"`
+	BasePath         string `json:"base_path,omitempty"`
+	Branch           string `json:"branch,omitempty"`
+	RequiresApproval bool   `json:"requires_approval,omitempty"`
+	ReleaseRetention int    `json:"release_retention,omitempty"`
+	AutoDeploy       bool   `json:"auto_deploy,omitempty"`
+}
+
+// CreateProject returns the resource needed for the next repository or environment step.
+func (c *Client) CreateProject(ctx context.Context, id string, opts CreateProjectOptions) (*Project, error) {
+	var out envelope[Project]
+	if err := c.post(ctx, "organizations/"+url.PathEscape(id)+"/projects", opts, &out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+// CreateRepository includes any generated deploy key so the operator can install it.
+func (c *Client) CreateRepository(ctx context.Context, id string, opts CreateRepositoryOptions) (*Repository, error) {
+	var out envelope[Repository]
+	if err := c.post(ctx, "projects/"+url.PathEscape(id)+"/repositories", opts, &out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+// CreateEnvironment creates the environment before servers or pipelines can be attached.
+func (c *Client) CreateEnvironment(ctx context.Context, id string, opts CreateEnvironmentOptions) (*Environment, error) {
+	var out envelope[Environment]
+	if err := c.post(ctx, "projects/"+url.PathEscape(id)+"/environments", opts, &out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+// CopyPipeline copies the source version into a newly created environment.
+func (c *Client) CopyPipeline(ctx context.Context, id string, opts CopyPipelineOptions) (*Pipeline, error) {
+	var out envelope[Pipeline]
+	if err := c.post(ctx, "pipelines/"+url.PathEscape(id)+"/copy", opts, &out); err != nil {
+		return nil, err
+	}
+	return &out.Data, nil
+}
+
+// ProjectGroups supplies the optional organization grouping choices.
+func (c *Client) ProjectGroups(ctx context.Context, id string) ([]ProjectGroup, error) {
+	var out envelope[[]ProjectGroup]
+	if err := c.get(ctx, "organizations/"+url.PathEscape(id)+"/project-groups", nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+// Repositories supplies the required repository choices for an environment.
+func (c *Client) Repositories(ctx context.Context, id string) ([]Repository, error) {
+	var out envelope[[]Repository]
+	if err := c.get(ctx, "projects/"+url.PathEscape(id)+"/repositories", nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+// Pipelines lets intake select the active version from a source environment.
+func (c *Client) Pipelines(ctx context.Context, id string) ([]Pipeline, error) {
+	var out envelope[[]Pipeline]
+	if err := c.get(ctx, "environments/"+url.PathEscape(id)+"/pipelines", nil, &out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
+}
+
+// Servers follows every page so choices include the entire organization.
+func (c *Client) Servers(ctx context.Context, id string) ([]Server, error) {
+	var all []Server
+	for page := 1; ; page++ {
+		var out pagedEnvelope[[]Server]
+		if err := c.get(ctx, "organizations/"+url.PathEscape(id)+"/servers", url.Values{"per_page": {"100"}, "page": {strconv.Itoa(page)}}, &out); err != nil {
+			return nil, err
+		}
+		all = append(all, out.Data...)
+		if len(out.Data) == 0 || out.Meta.LastPage <= page {
+			return all, nil
+		}
+	}
+}
+
+// SyncEnvironmentServers replaces attachments in one request, preserving primary selection.
+func (c *Client) SyncEnvironmentServers(ctx context.Context, id string, servers []ServerAttachment) error {
+	return c.put(ctx, "environments/"+url.PathEscape(id)+"/servers", struct {
+		Servers []ServerAttachment `json:"servers"`
+	}{servers}, nil)
+}
+
+// CopyPipelineOptions identifies the destination without exposing pipeline internals.
+type CopyPipelineOptions struct {
+	EnvironmentID string `json:"environment_id,omitempty"`
+}

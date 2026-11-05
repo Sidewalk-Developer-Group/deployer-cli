@@ -170,3 +170,40 @@ type CliRelease struct {
 		Script   string `json:"script"`
 	} `json:"install"`
 }
+
+// ProjectGroup and repository metadata drive intake choices without extra lookups.
+type ProjectGroup struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Position int    `json:"position"`
+}
+type Repository struct {
+	ID            string     `json:"id"`
+	Provider      string     `json:"provider"`
+	RepoURL       string     `json:"repo_url"`
+	DefaultBranch string     `json:"default_branch"`
+	CloneAuth     string     `json:"clone_auth"`
+	DeployKey     *DeployKey `json:"deploy_key,omitempty"`
+}
+type DeployKey struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Fingerprint string `json:"fingerprint"`
+	PublicKey   string `json:"public_key"`
+}
+type Server struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	Address          string `json:"address"`
+	ConnectionStatus string `json:"connection_status"`
+}
+type Pipeline struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	IsActive bool   `json:"is_active"`
+	Version  int    `json:"version"`
+}
+type ServerAttachment struct {
+	ServerID  string `json:"server_id,omitempty"`
+	IsPrimary bool   `json:"is_primary,omitempty"`
+}

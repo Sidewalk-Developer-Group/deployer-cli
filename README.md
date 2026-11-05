@@ -106,6 +106,28 @@ Add `--json` to any command for machine-readable output. While following, `--jso
 newline-delimited events (`{"type":"log",…}`, `{"type":"status",…}`) so you can pipe it
 into `jq`.
 
+## Create projects and environments
+
+```sh
+# Guided intake in a terminal
+deployer projects create
+deployer envs create billing-api
+
+# Flags and defaults, without prompts
+deployer projects create --name "Billing API" --type laravel --repo-url https://github.com/acme/billing.git --yes
+deployer envs create billing-api --name Production --branch main --server web-1 --yes
+```
+
+`projects create` and `envs create <project>` also accept `add` and `new` aliases.
+Prompts appear only when stdin is a terminal. `--yes` (`-y`) or `--no-input`
+disables prompts and confirmation; supply `--name` and, when several repositories
+exist, `--repo <id-or-URL>`. Slugs default from names. Use `--json` for created
+resources. Repository intake is available on either command with `--repo-url`,
+`--provider`, and `--default-branch`. Set `DEPLOYER_CLONE_TOKEN` for HTTPS clone
+credentials without placing a secret in shell history; token prompts are hidden.
+Environment options include repeatable `--server`, `--pipeline-from <env-slug>`,
+`--requires-approval`, `--auto-deploy`, `--url`, `--base-path`, and `--retention`.
+
 ## In CI
 
 Following is on by default everywhere, terminal or not, so a CI job gets the real

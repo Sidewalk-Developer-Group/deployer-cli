@@ -214,3 +214,8 @@ func (p *Printer) Table(headers []string, rows [][]string) {
 
 	_ = writer.Flush()
 }
+
+// Green, Red and Muted let intake share the printer's terminal color policy.
+func (p *Printer) Green(s string) string { return p.paint(green, s) }
+func (p *Printer) Red(s string) string   { return p.paint(red, s) }
+func (p *Printer) Muted(s string) string { return p.paint(dim, s) }

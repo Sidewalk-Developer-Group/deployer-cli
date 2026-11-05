@@ -64,11 +64,11 @@ func newProjectsCommand(f *Factory) *cobra.Command {
 	projects := &cobra.Command{
 		Use:     "projects",
 		Short:   "Work with projects",
-		Long:    "Project subcommands. Today: `ls`.",
+		Long:    "Project subcommands: `ls`, `create`.",
 		Aliases: []string{"project"},
 		Args:    cobra.NoArgs,
 	}
-	projects.AddCommand(list)
+	projects.AddCommand(list, newProjectsCreateCommand(f))
 
 	return projects
 }
@@ -131,11 +131,11 @@ func newEnvsCommand(f *Factory) *cobra.Command {
 	envs := &cobra.Command{
 		Use:     "envs",
 		Short:   "Work with environments",
-		Long:    "Environment subcommands. Today: `ls <project>`.",
+		Long:    "Environment subcommands: `ls <project>`, `create <project>`.",
 		Aliases: []string{"env", "environments"},
 		Args:    cobra.NoArgs,
 	}
-	envs.AddCommand(list)
+	envs.AddCommand(list, newEnvsCreateCommand(f))
 
 	return envs
 }
