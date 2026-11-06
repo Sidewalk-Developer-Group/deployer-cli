@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode"
 
 	"github.com/sidewalk-developer-group/deployer-cli/internal/api"
 )
@@ -89,8 +90,20 @@ func (p *Printer) Dim(format string, args ...any) {
 	p.Printf("%s\n", p.paint(dim, fmt.Sprintf(format, args...)))
 }
 
+// Warn often carries server-supplied text (stage names, export warnings), so
+// control characters are stripped: an ESC or OSC must not reach the terminal.
 func (p *Printer) Warn(format string, args ...any) {
-	fmt.Fprintf(p.Err, "%s %s\n", p.paint(yellow, "!"), fmt.Sprintf(format, args...))
+	fmt.Fprintf(p.Err, "%s %s\n", p.paint(yellow, "!"), stripControl(fmt.Sprintf(format, args...)))
+}
+
+func stripControl(s string) string {
+	return strings.Map(func(r rune) rune {
+		// C0, DEL and C1 (U+009B is a one-byte CSI on some terminals).
+		if unicode.IsControl(r) && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // Fail writes the terminal error. Always stderr, so `deployer logs ... > file`
