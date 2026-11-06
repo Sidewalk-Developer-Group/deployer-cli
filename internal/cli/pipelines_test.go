@@ -121,3 +121,85 @@ func TestPipelineValidationProblemAndSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPipelineExportWarnings(t *testing.T) {
+	warnings := []string{
+		"custom_command stage 'Deploy': config.command redacted (looked like a credential)",
+		"custom_command stage 'Upload': config.command redacted (looked like a credential)",
+	}
+	header, err := json.Marshal(warnings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := []byte("name: Example\nstages:\n  - config:\n      command: «redacted»\n")
+	for _, header := range []string{string(header), "", `["partial",42]`} {
+		for _, fileOutput := range []bool{false, true} {
+			t.Run(fmt.Sprintf("header=%q/file=%t", header, fileOutput), func(t *testing.T) {
+				c := createClient(t, func(w http.ResponseWriter, r *http.Request) {
+					if strings.HasSuffix(r.URL.Path, "/export") {
+						if header != "" {
+							w.Header().Set("X-Deployer-Export-Warnings", header)
+						}
+						w.Write(body)
+						return
+					}
+					fmt.Fprint(w, `{"data":[{"id":"p","is_active":true}]}`)
+				})
+				var out, stderr bytes.Buffer
+				printer := &ui.Printer{Out: &out, Err: &stderr}
+				path := ""
+				if fileOutput {
+					path = filepath.Join(t.TempDir(), "pipeline.yaml")
+				}
+				if err := exportPipeline(context.Background(), c, printer, "env", "", path, &out); err != nil {
+					t.Fatal(err)
+				}
+				if fileOutput {
+					b, err := os.ReadFile(path)
+					if err != nil || !bytes.Equal(b, body) || out.Len() != 0 {
+						t.Fatalf("file=%q stdout=%q err=%v", b, out.String(), err)
+					}
+				} else if !bytes.Equal(out.Bytes(), body) {
+					t.Fatalf("stdout=%q", out.String())
+				}
+				if strings.HasPrefix(header, `["custom_command`) {
+					for _, warning := range warnings {
+						if !strings.Contains(stderr.String(), warning) {
+							t.Fatal(stderr.String())
+						}
+					}
+					hint := "redacted values must be replaced before import; use environment-variable secrets (e.g. $DEPLOY_TOKEN) instead"
+					if strings.Index(stderr.String(), hint) < strings.Index(stderr.String(), warnings[1])+len(warnings[1]) {
+						t.Fatal(stderr.String())
+					}
+				} else if strings.Contains(stderr.String(), "!") || strings.Contains(stderr.String(), "redacted") {
+					t.Fatal(stderr.String())
+				}
+			})
+		}
+	}
+}
+
+func TestPipelineImportRedactedValidation(t *testing.T) {
+	message := "Still contains the «redacted» placeholder from an export. Replace it with the real value, or better, an environment variable such as $DEPLOY_TOKEN."
+	c := createClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || !strings.HasSuffix(r.URL.Path, "/import") {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(map[string]any{
+			"title":  "Invalid YAML",
+			"errors": map[string][]string{"stages.0.config.command": {message}},
+		})
+	})
+	var out, stderr bytes.Buffer
+	printer := &ui.Printer{Out: &out, Err: &stderr}
+	err := importPipeline(context.Background(), c, printer, nil, "env", "project/env", []byte("name: Test\nstages:\n  - config:\n      command: «redacted»\n"), pipelineImportOptions{yes: true})
+	if exit.Code(err) != exit.Usage {
+		t.Fatal(err)
+	}
+	printer.Fail("%s", err)
+	if !strings.Contains(stderr.String(), "stages.0.config.command: "+message) {
+		t.Fatal(stderr.String())
+	}
+}

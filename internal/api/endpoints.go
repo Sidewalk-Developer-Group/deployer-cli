@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strconv"
 )
@@ -349,15 +350,19 @@ type CopyPipelineOptions struct {
 }
 
 // ExportPipeline preserves the server's deterministic YAML without re-encoding it.
-func (c *Client) ExportPipeline(ctx context.Context, id string) ([]byte, error) {
+func (c *Client) ExportPipeline(ctx context.Context, id string) ([]byte, []string, error) {
 	response, err := c.raw(ctx, "GET", "pipelines/"+url.PathEscape(id)+"/export", nil, nil, nil, false)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if response.Status < 200 || response.Status >= 300 {
-		return nil, ParseProblem(response.Status, response.Body)
+		return nil, nil, ParseProblem(response.Status, response.Body)
 	}
-	return response.Body, nil
+	var warnings []string
+	if err := json.Unmarshal([]byte(response.Headers.Get("X-Deployer-Export-Warnings")), &warnings); err != nil {
+		warnings = nil
+	}
+	return response.Body, warnings, nil
 }
 
 // ImportPipeline leaves validation and stage schema ownership on the server.

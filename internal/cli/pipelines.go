@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// exportPipeline writes the original bytes so export/import is lossless.
+// exportPipeline writes the server's YAML bytes without re-encoding them.
 func exportPipeline(ctx context.Context, c *api.Client, printer *ui.Printer, env, id, file string, out io.Writer) error {
 	pipelines, err := c.Pipelines(ctx, env)
 	if err != nil {
@@ -33,20 +33,29 @@ func exportPipeline(ctx context.Context, c *api.Client, printer *ui.Printer, env
 		}
 		return exit.Errorf(exit.Usage, "environment has no active pipeline; pass --pipeline <id>")
 	}
-	b, err := c.ExportPipeline(ctx, selected)
+	b, warnings, err := c.ExportPipeline(ctx, selected)
 	if err != nil {
-		return err
-	}
-	if file == "" {
-		_, err = out.Write(b)
-		return err
-	}
-	if err = os.WriteFile(file, b, 0644); err != nil {
 		return err
 	}
 	side := *printer
 	side.Out = printer.Err
-	side.Success("exported pipeline to %s", file)
+	if file == "" {
+		_, err = out.Write(b)
+	} else {
+		err = os.WriteFile(file, b, 0644)
+	}
+	if err != nil {
+		return err
+	}
+	for _, warning := range warnings {
+		side.Warn("%s", warning)
+	}
+	if len(warnings) > 0 {
+		side.Warn("redacted values must be replaced before import; use environment-variable secrets (e.g. $DEPLOY_TOKEN) instead")
+	}
+	if file != "" {
+		side.Success("exported pipeline to %s", file)
+	}
 	return nil
 }
 
@@ -138,7 +147,7 @@ func newPipelinesCommand(f *Factory) *cobra.Command {
 		Aliases: []string{"pipeline"},
 		Short:   "List, export and import environment pipelines",
 		Long: "Manage pipeline versions for a project and environment, using their slugs.\n" +
-			"Export unchanged YAML for review or import it into another environment.",
+			"Export server-generated YAML for review or import it into another environment.",
 		Example: "  deployer pipelines ls billing-api production\n" +
 			"  deployer pipelines export billing-api production -o pipeline.yml\n" +
 			"  deployer pipelines import billing-api staging -f pipeline.yml",
@@ -190,8 +199,9 @@ func newPipelinesCommand(f *Factory) *cobra.Command {
 		Use:   "export <project> <env>",
 		Short: "Export the active pipeline as YAML",
 		Long: "Writes the server's YAML unchanged to stdout, or to a file with -o. Exports\n" +
-			"contain no secret values. Defaults to the active pipeline; --pipeline selects\n" +
-			"a version by ID from `deployer pipelines ls`.",
+			"redact inline credentials; warnings go to stderr. Replace redacted values before\n" +
+			"import. Defaults to the active pipeline; --pipeline selects a version by ID\n" +
+			"from `deployer pipelines ls`.",
 		Example: "  deployer pipelines export billing-api production -o pipeline.yml\n" +
 			"  deployer pipelines export billing-api production | deployer pipelines import billing-api staging -f - --yes",
 		Args: wantArgs(2, 2, "deployer pipelines export <project> <env>"),
