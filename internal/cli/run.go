@@ -270,6 +270,15 @@ func explainExecDenied(printer *ui.Printer, err error) error {
 	}
 
 	printer.Fail("%s", problem.Error())
+
+	// The org's two-factor requirement is the one 403 the server names; the
+	// token and role advice below would send the user the wrong way.
+	if strings.HasSuffix(problem.Type, "/problems/mfa-required") {
+		printer.Dim("Your organization requires two-factor — enable it in Settings → Security.")
+
+		return exit.With(exit.Auth, errSilent)
+	}
+
 	printer.Dim("Running commands needs a token with the environments:exec ability — create one in the web app under Settings → Security → Personal access tokens.")
 	printer.Dim("Your role must also grant it (owner or admin), and on a protected environment you must be allowed to deploy.")
 

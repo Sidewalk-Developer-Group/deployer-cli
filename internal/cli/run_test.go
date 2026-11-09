@@ -51,6 +51,8 @@ type fakeCommands struct {
 	cancelled bool
 	started   map[string]any
 	forbidden bool
+	// mfaRequired: the org requires two-factor and the user has none.
+	mfaRequired bool
 	// stubborn: the cancel is accepted but the command never stops.
 	stubborn    bool
 	cancelCalls int
@@ -67,6 +69,13 @@ func (f *fakeCommands) serve(t *testing.T) *api.Client {
 
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/environments/env1/commands":
+			if f.mfaRequired {
+				w.Header().Set("Content-Type", "application/problem+json")
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"type":"https://deployer.dev/problems/mfa-required","title":"Two-factor authentication required.","status":403,"detail":"Acme requires two-factor authentication. Turn it on in Settings → Security to continue."}`))
+
+				return
+			}
 			if f.forbidden {
 				w.Header().Set("Content-Type", "application/problem+json")
 				w.WriteHeader(http.StatusForbidden)
@@ -335,5 +344,27 @@ func TestCommandLineJoinsLikeSSH(t *testing.T) {
 
 	if got := commandLine([]string{"p", "e", "tail -n 5 log | grep x"}); got != "tail -n 5 log | grep x" {
 		t.Errorf("got %q", got)
+	}
+}
+
+// Regression: an org two-factor requirement got the token/role hint.
+func TestMfaRequiredNamesTwoFactorNotTheToken(t *testing.T) {
+	client := (&fakeCommands{mfaRequired: true}).serve(t)
+	printer, out, errOut := testPrinter()
+
+	_, err := client.RunCommand(bounded(t), "env1", api.CommandOptions{Command: "ls"})
+	err = explainExecDenied(printer, err)
+
+	if got := exit.Code(err); got != exit.Auth {
+		t.Fatalf("exit code = %d, want %d", got, exit.Auth)
+	}
+
+	text := out.String() + errOut.String()
+	if !strings.Contains(text, "Your organization requires two-factor — enable it in Settings → Security") {
+		t.Errorf("two-factor hint missing:\n%s", text)
+	}
+
+	if strings.Contains(text, "environments:exec") {
+		t.Errorf("the token hint must not follow a two-factor refusal:\n%s", text)
 	}
 }
