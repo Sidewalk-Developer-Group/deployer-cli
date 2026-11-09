@@ -43,7 +43,7 @@ func newRunCommand(f *Factory) *cobra.Command {
 			"then exits 130; a second Ctrl-C stops waiting at once. If the outcome is\n" +
 			"unknown (the connection to the server dropped) it exits 1. Before the command\n" +
 			"starts the usual CLI codes apply: 2 usage, 3 auth, 4 API.\n\n" +
-			"Needs a token with the environments:exec ability (Settings › Tokens) and an\n" +
+			"Needs a token with the environments:exec ability (Settings → Security → Personal access tokens) and an\n" +
 			"owner or admin role; one command runs per environment at a time.",
 		Example: "  deployer run billing-api production -- php artisan migrate:status\n" +
 			"  deployer run billing-api staging -- 'tail -n 50 storage/logs/laravel.log | grep ERROR'\n" +
@@ -270,7 +270,7 @@ func explainExecDenied(printer *ui.Printer, err error) error {
 	}
 
 	printer.Fail("%s", problem.Error())
-	printer.Dim("Running commands needs a token with the environments:exec ability — create one in the web app under Settings › Tokens.")
+	printer.Dim("Running commands needs a token with the environments:exec ability — create one in the web app under Settings → Security → Personal access tokens.")
 	printer.Dim("Your role must also grant it (owner or admin), and on a protected environment you must be allowed to deploy.")
 
 	return exit.With(exit.Auth, errSilent)

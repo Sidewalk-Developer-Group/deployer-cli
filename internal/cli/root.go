@@ -243,7 +243,7 @@ func NewRootCommand(version, commit string) *cobra.Command {
 			"\n" +
 			"Getting started:\n" +
 			"  1. deployer login --api https://deployer.example.com\n" +
-			"     Create a token in the web app under Settings > Tokens.\n" +
+			"     Create a token in the web app under Settings → Security → Personal access tokens.\n" +
 			"  2. deployer projects ls; deployer projects create\n" +
 			"  3. deployer envs create <project>   (or envs ls <project>)\n" +
 			"  4. deployer deploy <project> <environment>\n" +

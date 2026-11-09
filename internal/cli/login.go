@@ -27,7 +27,7 @@ func newLoginCommand(f *Factory) *cobra.Command {
 		Use:   "login",
 		Short: "Store an API token for a Deployer instance",
 		Long: "Stores a personal access token for an instance in the OS keychain.\n\n" +
-			"Create the token in the web app under Settings › Tokens with at least the\n" +
+			"Create the token in the web app under Settings → Security → Personal access tokens with at least the\n" +
 			"projects:read, deployments:read and deployments:create abilities (add\n" +
 			"deployments:approve to approve or reject from the terminal).\n\n" +
 			"The token is read from a prompt or from stdin — never from a flag, which\n" +
@@ -142,7 +142,7 @@ func newLogoutCommand(f *Factory) *cobra.Command {
 		Use:   "logout",
 		Short: "Forget the stored token for a context",
 		Long: "Deletes the locally stored token. The token itself stays valid until it is\n" +
-			"revoked in the web app under Settings › Tokens.",
+			"revoked in the web app under Settings → Security → Personal access tokens.",
 		Example: "  deployer logout\n  deployer logout --context staging",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -174,7 +174,7 @@ func newLogoutCommand(f *Factory) *cobra.Command {
 			}
 
 			printer.Success("removed the stored token for %q", name)
-			printer.Dim("revoke it in the web app under Settings › Tokens if it should stop working")
+			printer.Dim("revoke it in the web app under Settings → Security → Personal access tokens if it should stop working")
 
 			return nil
 		},

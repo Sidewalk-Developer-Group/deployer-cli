@@ -72,7 +72,7 @@ func newContextCommand(f *Factory) *cobra.Command {
 			Short: "Forget an instance (and its stored token)",
 			Long: "Removes the context from the config file and deletes its stored token, so no\n" +
 				"credential is left behind for an instance you can no longer see. The token\n" +
-				"itself stays valid until revoked in the web app under Settings > Tokens.",
+				"itself stays valid until revoked in the web app under Settings → Security → Personal access tokens.",
 			Example: "  deployer context rm staging",
 			Args:    wantArgs(1, 1, "deployer context rm <name>   — names come from `deployer context ls`"),
 			RunE: func(cmd *cobra.Command, args []string) error {

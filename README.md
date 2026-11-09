@@ -36,10 +36,12 @@ Or download a binary for macOS/Linux (amd64/arm64) from the
 ## Log in
 
 Deployer is self-hosted, so start by pointing the CLI at your instance. Create a
-personal access token in the web app under **Settings › Tokens** with at least the
+personal access token in the web app under **Settings → Security → Personal access tokens** with at least the
 `projects:read`, `deployments:read` and `deployments:create` abilities — add
 `deployments:approve` to approve or reject from the terminal, and `environments:exec`
 to use `deployer run` (owner/admin roles only; never granted to existing tokens).
+New tokens are scoped to one organization by default, which is what a CI token
+should be; the CLI then sees only that organization.
 
 ```sh
 deployer login --api https://deployer.example.com
@@ -104,7 +106,7 @@ than the environment's primary.
 
 The token needs the `environments:exec` ability — a 403 means it is missing (or your role
 or the protected-environment rules do not allow it). Create a token with it under
-**Settings › Tokens**.
+**Settings → Security → Personal access tokens**.
 
 Add `--json` to commands that render resources for machine-readable output (`api`
 and `pipelines export` always return the raw response). While following, `--json` emits
@@ -184,7 +186,7 @@ outcome without asking for it:
 
 ```sh
 export DEPLOYER_API_URL=https://deployer.example.com
-export DEPLOYER_TOKEN=$DEPLOYER_DEPLOY_TOKEN   # a scoped token from Settings › Tokens
+export DEPLOYER_TOKEN=$DEPLOYER_DEPLOY_TOKEN   # a scoped token from Settings → Security → Personal access tokens
 export DEPLOYER_ORG=acme
 
 deployer deploy billing-api production --json

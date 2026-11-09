@@ -292,7 +292,7 @@ func TestForbiddenNamesTheExecAbility(t *testing.T) {
 	}
 
 	text := out.String() + errOut.String()
-	for _, want := range []string{"environments:exec", "Settings › Tokens"} {
+	for _, want := range []string{"environments:exec", "Settings → Security → Personal access tokens"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("hint missing %q:\n%s", want, text)
 		}
