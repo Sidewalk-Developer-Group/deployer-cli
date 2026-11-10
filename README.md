@@ -67,6 +67,7 @@ deployer version --check
 ```sh
 deployer projects ls
 deployer envs ls billing-api
+deployer projects billing-api                  # same as envs ls billing-api
 deployer status billing-api                     # every environment at a glance
 deployer status billing-api production          # the last deployment in detail
 

@@ -62,12 +62,20 @@ func newProjectsCommand(f *Factory) *cobra.Command {
 	}
 
 	projects := &cobra.Command{
-		Use:     "projects",
-		Short:   "Work with projects",
-		Long:    "List projects in the selected organization or create a project with an optional repository.",
-		Example: "  deployer projects ls\n  deployer projects create --name 'Billing API' --type laravel --yes",
+		Use:   "projects [project]",
+		Short: "Work with projects",
+		Long: "List projects in the selected organization or create a project with an optional repository.\n" +
+			"Passing a project slug lists its environments, same as `deployer envs ls <project>`.",
+		Example: "  deployer projects ls\n  deployer projects billing-api\n  deployer projects create --name 'Billing API' --type laravel --yes",
 		Aliases: []string{"project"},
-		Args:    cobra.NoArgs,
+		Args:    wantArgs(0, 1, "deployer projects <project>   — the project slug, as listed by `deployer projects ls`"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return cmd.Help()
+			}
+
+			return listEnvironments(cmd, f, args[0])
+		},
 	}
 	projects.AddCommand(list, newProjectsCreateCommand(f))
 
@@ -85,47 +93,7 @@ func newEnvsCommand(f *Factory) *cobra.Command {
 		Example: "  deployer envs ls billing-api",
 		Args:    wantArgs(1, 1, "deployer envs ls <project>   — the project slug, as listed by `deployer projects ls`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			printer := f.Printer()
-
-			s, err := f.session()
-			if err != nil {
-				return err
-			}
-			s.warnFileToken(printer)
-
-			organization, err := f.organization(cmd.Context(), s)
-			if err != nil {
-				return err
-			}
-
-			target, err := s.Client.Resolve(cmd.Context(), organization, args[0], "")
-			if err != nil {
-				return explainResolveFailure(printer, err, args[0], "")
-			}
-
-			environments, err := s.Client.Environments(cmd.Context(), target.Project.ID)
-			if err != nil {
-				return err
-			}
-
-			if f.JSON {
-				return printJSON(printer, environments)
-			}
-
-			if len(environments) == 0 {
-				printer.Printf("%s has no environments yet\n", target.Project.Slug)
-
-				return nil
-			}
-
-			rows := make([][]string, 0, len(environments))
-			for _, environment := range environments {
-				rows = append(rows, []string{environment.Slug, environment.Name, environment.Branch, orDash(environment.URL), lockLabel(environment)})
-			}
-
-			printer.Table([]string{"ENVIRONMENT", "NAME", "BRANCH", "URL", "NOTES"}, rows)
-
-			return nil
+			return listEnvironments(cmd, f, args[0])
 		},
 	}
 
@@ -140,4 +108,48 @@ func newEnvsCommand(f *Factory) *cobra.Command {
 	envs.AddCommand(list, newEnvsCreateCommand(f))
 
 	return envs
+}
+
+func listEnvironments(cmd *cobra.Command, f *Factory, slug string) error {
+	printer := f.Printer()
+
+	s, err := f.session()
+	if err != nil {
+		return err
+	}
+	s.warnFileToken(printer)
+
+	organization, err := f.organization(cmd.Context(), s)
+	if err != nil {
+		return err
+	}
+
+	target, err := s.Client.Resolve(cmd.Context(), organization, slug, "")
+	if err != nil {
+		return explainResolveFailure(printer, err, slug, "")
+	}
+
+	environments, err := s.Client.Environments(cmd.Context(), target.Project.ID)
+	if err != nil {
+		return err
+	}
+
+	if f.JSON {
+		return printJSON(printer, environments)
+	}
+
+	if len(environments) == 0 {
+		printer.Printf("%s has no environments yet\n", target.Project.Slug)
+
+		return nil
+	}
+
+	rows := make([][]string, 0, len(environments))
+	for _, environment := range environments {
+		rows = append(rows, []string{environment.Slug, environment.Name, environment.Branch, orDash(environment.URL), lockLabel(environment)})
+	}
+
+	printer.Table([]string{"ENVIRONMENT", "NAME", "BRANCH", "URL", "NOTES"}, rows)
+
+	return nil
 }
